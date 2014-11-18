@@ -1,0 +1,11 @@
+# Nmap 6.47 scan initiated Tue Nov 18 13:15:32 2014 as: nmap -sC -oN completed_scans/scan_block_0 -iL ip_blocks/unscanned_blocks/ip_block_0
+Nmap scan report for localhost (127.0.0.1)
+Host is up (0.0011s latency).
+Not shown: 500 filtered ports, 499 closed ports
+PORT    STATE SERVICE
+631/tcp open  ipp
+| http-methods: Potentially risky methods: PUT
+|_See http://nmap.org/nsedoc/scripts/http-methods.html
+|_http-title: Web Interface is Disabled - CUPS v1.7.2
+
+# Nmap done at Tue Nov 18 13:15:36 2014 -- 8 IP addresses (1 host up) scanned in 4.67 seconds

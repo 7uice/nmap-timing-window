@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import sys, re, os
+from datetime import datetime
 
 
 
@@ -121,56 +122,104 @@ def enumerate_ips():
 
 ################################################
 
+def scan_block(block_index, target_path, nmap_command):
+	target = target_path + 'ip_block_' + str(block_index)
+	if os.path.exists(target):
+		if not os.path.exists('completed_scans'):
+			os.makedirs('completed_scans')
+		nmap_command += ' -oN completed_scans/scan_block_' + str(block_index) + ' -iL ' + target
+		print nmap_command
+		os.system(nmap_command)
+		if not os.path.exists('ip_blocks/scanned_blocks'):
+			os.makedirs('ip_blocks/scanned_blocks')
+		os.system('mv ' + target + ' ip_blocks/scanned_blocks/ip_block_' + str(block_index))
+		return True
+	else:
+		print '[e]: Target file ' + target + ' cannot be found.'
+		return False
 
+def clean():
+	if os.path.exists('ip_blocks'):
+		os.system('rm -r ip_blocks')
+	if os.path.exists('completed_scans'):
+		os.system('rm -r completed_scans')
 
 def main():
-	print 'Nmap Time Controller'
-	ips = enumerate_ips()
+	print '****************************'
+	print '*** Nmap Time Controller ***'
+	print '****************************'
+	print '\n'
+	
+
+	if sys.argv[1] == 'clean':
+		print 'Cleaning project...'
+		clean()
+		print 'Done.\n\n'
+		exit()
+
+	######################################################################
+	### Enumerate IPs and split into groups of 8 for nmap to work with ###
+	######################################################################
+	ips = enumerate_ips().splitlines()
 	valid_time_beginning = raw_input('What time should the scan START? (Please use military time format i.e. 22:00)\n')
 	valid_time_end = raw_input('What time should the scan END?\n')
-	nmap_string = raw_input('Enter in the nmap command for the scan: (i.e. nmap -sC -oN scan_results.nmap\nDo not include target specifications. We take care of that.\n')
+	nmap_command = raw_input('Enter in the nmap command for the scan: (i.e. nmap -sC \nDo not include target specifications or output specifications. We take care of that.\n')
+	# Hard coded to avoid repeatedly inputting while testing
+	valid_time_beginning = datetime.strptime('11:00', '%H:%M').time()
+	valid_time_end = datetime.strptime('13:16', '%H:%M').time()
+	nmap_command = 'nmap -sC'
 
 	print 'IPs to scan:\n', ips
-	print 'Scan window: ', valid_time_beginning, ' - ', valid_time_end
-	print 'Nmap command: ', nmap_string		
+	print 'Scan window: ', valid_time_beginning.strftime('%H:%M'), ' - ', valid_time_end.strftime('%H:%M')
+	print 'Nmap command: ', nmap_command		
 
+	# FIX THIS LATER
+	# Currently leaves off IPs (only gets all IPs when divisible by 8)
 	# Put IPs in groups of 8. Keep them in groups of 8 so nmap can do it's parallelization magic while scanning.
-	# index = 0
-	# group_index = 0
-	# ip_group = '' # Groups of 8 IPs
-	# for ip in ips:
-	# 	if index < 8: # Keep going until we have a group of 8 IPs
-	# 		ip_group += ip
-	# 		index += 1
-	# 	else: # We have a block of 8. Write it to file and get the next block
-	# 		if not os.path.exists('IP_Blocks'):
-	# 			os.makedirs('IP_Blocks')
-	# 		file_name = 'IP_Block_' + str(group_index)
-	# 		f = open(file_name, 'w')
-	# 		f.write(ip_group)
-	# 		f.close()
-	# 		index = 0
-	# 		group_index += 1
-	# 		ip_group = ''
-
-	# counter = 0
-	# ip_block = ''
-	# for ip in ips:
-	# 	if counter < 8:
-	# 		ip_block += (str(ip) + '\n')
-	# 		counter += 1
-	# 	else:
-	# 		print 'Block of 8:'
-	# 		print ip_block
-	# 		ip_block = ''
-	# 		counter = 0
-
-	print 'Test'
+	counter = 0
+	ip_block = ''
+	block_index = 0
 	for ip in ips:
-		print ip
+		if counter < 8:
+			ip_block += (str(ip) + '\n')
+			counter += 1
+		else:
+			if not os.path.exists('ip_blocks/unscanned_blocks'):
+				os.makedirs('ip_blocks/unscanned_blocks')
+			file_name = 'ip_blocks/unscanned_blocks/ip_block_' + str(block_index)
+			f = open(file_name, 'w')
+			f.write(ip_block)
+			f.close()
+			ip_block = ''
+			counter = 0
+			block_index += 1
 
+	###################################################################
+	### Start the scanning process while monitoring time boundaries ###
+	###################################################################
+	
+	# if current_time is in range, start a single scan
+	# when the scan is finished, move the block of ips that was scanned to the 'completed' folder
+	# Also write the results to a file
+	# repeat until a) No ip blocks are left or b) we run out of time
+	# once all IP blocks are done, we'll combine the files
 
+	current_time = datetime.now().time()
+	block_index = 0
+	target_path = 'ip_blocks/unscanned_blocks/'
 
+	while (current_time > valid_time_beginning) and (current_time < valid_time_end) and os.listdir(target_path) != []: 
+		print 'Debug WHILE loop:'
+		# a = current_time > valid_time_beginning
+		# b = current_time < valid_time_end
+		# c = os.listdir(target_path) != []
+		# print '\na: ' + str(a)
+		# print 'b: ' + str(b)
+		# print 'c: ' + str(c)
+		# print '\n\n'
+		scan_block(block_index, target_path, nmap_command)
+		block_index += 1
+		current_time = datetime.now().time()
 	
 
 if __name__ == "__main__":
