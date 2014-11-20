@@ -1,7 +1,11 @@
 #!/usr/bin/python
 
-import sys, re, os, time
+import sys, re, os, time, glob
 from datetime import datetime
+try:
+    import xml.etree.cElementTree as ET
+except ImportError:
+    import xml.etree.ElementTree as ET
 
 
 
@@ -128,7 +132,7 @@ def scan_block(block_index, target_path, nmap_command):
 	if os.path.exists(target):
 		if not os.path.exists('completed_scans'):
 			os.makedirs('completed_scans')
-		nmap_command += ' -oN completed_scans/scan_block_' + str(block_index) + ' -iL ' + target
+		nmap_command += ' -oA completed_scans/scan_block_' + str(block_index) + ' -iL ' + target
 		print nmap_command
 		os.system(nmap_command)
 		if not os.path.exists('ip_blocks/scanned_blocks'):
@@ -262,19 +266,50 @@ def combine():
 		print 'No block scans have been completed.\nStart the block scanning process with ./nmap_time_controller new [target file] or ./nmap_time_controller resume.'
 		print 'exiting...'
 		exit()
-		if os.path.exists('completed_scans/scan_results'):
-			os.remove('completed_scans/scan_results')
-		filenames = []
-		for filename in os.listdir('completed_scans'):
-			filenames.append('completed_scans/' + filename)
-		with open('completed_scans/scan_results', 'w') as outfile:
-			for fname in filenames:
-				with open(fname) as infile:
-					for line in infile:
-						outfile.write(line)
-		   	outfile.write('\n')	
-		print 'output block files combined and saved in completed_scans/scan_results. Enjoy.'	
+	if os.path.exists('completed_scans/scan_results.nmap'):
+		os.remove('completed_scans/scan_results.nmap')
+	if os.path.exists('completed_scans/scan_results.gnap'):
+		os.remove('completed_scans/scan_results.gnap')
+	if os.path.exists('completed_scans/scan_results.xml'):
+		os.remove('completed_scans/scan_results.xml')
+	combine_nmap()
+	combine_gnmap()
+	combine_xml()
+	print 'output block files combined and saved in completed_scans/scan_results.[nmap, gnmap, xml]. Enjoy.'	
 
+
+def combine_nmap():
+	filenames = []
+	for filename in glob.glob('completed_scans/*.nmap'):
+		filenames.append(filename)
+	with open('completed_scans/scan_results.nmap', 'w') as outfile:
+		for fname in filenames:
+			with open(fname) as infile:
+				for line in infile:
+					outfile.write(line)
+	   	outfile.write('\n')	
+		
+def combine_gnmap():
+	filenames = []
+	for filename in glob.glob('completed_scans/*.gnmap'):
+		filenames.append(filename)
+	with open('completed_scans/scan_results.gnmap', 'w') as outfile:
+		for fname in filenames:
+			with open(fname) as infile:
+				for line in infile:
+					outfile.write(line)
+	   	outfile.write('\n')	
+
+def combine_xml():
+	filenames = []
+	for filename in glob.glob('completed_scans/*.xml'):
+		filenames.append(filename)
+	with open('completed_scans/scan_results.xml', 'w') as outfile:
+		for fname in filenames:
+			with open(fname) as infile:
+				for line in infile:
+					outfile.write(line)
+	   	outfile.write('\n')	
 
 def clean(confirm = False):
 	if not confirm:

@@ -1,0 +1,2 @@
+# Nmap 6.47 scan initiated Thu Nov 20 09:38:13 2014 as: nmap -oA completed_scans/scan_block_8 -iL ip_blocks/unscanned_blocks/ip_block_8
+# Nmap done at Thu Nov 20 09:38:18 2014 -- 8 IP addresses (0 hosts up) scanned in 5.03 seconds
