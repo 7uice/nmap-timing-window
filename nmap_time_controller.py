@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, re, os
+import sys, re, os, time
 from datetime import datetime
 
 
@@ -9,6 +9,7 @@ from datetime import datetime
 ### Code to Enumerate IPs given a CIDR Block ###
 ################################################
 
+# Code to enumerate IPs given a CIDR Block from:
 # Expands a CIDR blocked IP into newline seperated IPs in that block.
 # Copyright (c) 2007 Brandon Sterne
 # Licensed under the MIT license.
@@ -146,8 +147,24 @@ def new_scan():
 	global scan_window_end
 	global nmap_command
 
-	clean()
-	
+	if len(sys.argv) < 3:
+		print '[ERROR]: Please specify a target file'
+		print 'exiting...'
+		exit()
+
+	if not os.path.exists(sys.argv[2]):
+		print '[ERROR]: File not found: ' + sys.argv[2]
+		print 'exiting...'
+		exit()	
+
+	a = raw_input('[WARNING]: Starting a new scan will wipe the results/progress of any current or past scan.\nAre you sure you want to continue? (Y/n) ')
+	if(a == 'Y' or a == 'y' or a == ''):
+		clean(True)
+	else:
+		print 'exiting without cleaning...'
+		exit()
+
+	print '\nStarting new scan...\n'
 	ips = enumerate_ips(sys.argv[2]).splitlines()
 	scan_window_start = raw_input('What time should the scan START? (Please use military time format i.e. 22:00)\n')
 	scan_window_end = raw_input('What time should the scan END?\n')
@@ -170,9 +187,9 @@ def new_scan():
 		f.write(nmap_command)
 				
 
-	print 'IPs to scan:\n', ips
-	print 'Scan window: ', scan_window_start.strftime('%H:%M'), ' - ', scan_window_end.strftime('%H:%M')
-	print 'Nmap command: ', nmap_command		
+	# print 'IPs to scan:\n', ips
+	# print 'Scan window: ', scan_window_start.strftime('%H:%M'), ' - ', scan_window_end.strftime('%H:%M')
+	# print 'Nmap command: ', nmap_command		
 
 	# FIX THIS LATER
 	# Currently leaves off IPs (only gets all IPs when divisible by 8)
@@ -197,17 +214,15 @@ def new_scan():
 
 	scan_loop()
 
-def scan_loop():
-	###################################################################
-	### Start the scanning process while monitoring time boundaries ###
-	###################################################################
-	
-	# if current_time is in range, start a single scan
-	# when the scan is finished, move the block of ips that was scanned to the 'completed' folder
-	# Also write the results to a file
-	# repeat until a) No ip blocks are left or b) we run out of time
-	# once all IP blocks are done, we'll combine the files
 
+# [DESC] scan_loop()
+# Start the scanning process while monitoring time boundaries
+# if current_time is in range, start a single scan
+# when the scan is finished, move the block of ips that was scanned to the 'completed' folder
+# Also write the results to a file
+# repeat until a) No ip blocks are left or b) we run out of time
+# once all IP blocks are done, we'll combine the files
+def scan_loop():
 	current_time = datetime.now().time()
 	block_index = 0
 	target_path = 'ip_blocks/unscanned_blocks/'
@@ -222,23 +237,72 @@ def scan_loop():
 	c = os.listdir(target_path) != []
 	if (not a) or (not b):
 		print 'Exiting because current_time is outside of valid scan_time window'
+		wait_for_valid_window()
 	if not c:
 		print 'Exiting because all targets have been scanned'
 
 
-def clean():
+def wait_for_valid_window():
+	global scan_window_start
+	global scan_window_end	
+
+	current_time = datetime.now().time()
+	while True:
+		if (current_time > scan_window_start) and (current_time < scan_window_end):
+			break
+		else:
+			print '\nWaiting for valid scan window'
+			print 'Current time: ' + current_time.strftime('%H:%M')
+			print 'Scan window: ' + scan_window_start.strftime('%H:%M') + ' - ' + scan_window_end.strftime('%H:%M')
+			time.sleep(15)
+		scan_loop()
+
+def combine():
+	if not os.path.exists('completed_scans') or os.listdir('completed_scans') == []:
+		print 'No block scans have been completed.\nStart the block scanning process with ./nmap_time_controller new [target file] or ./nmap_time_controller resume.'
+		print 'exiting...'
+		exit()
+		if os.path.exists('completed_scans/scan_results'):
+			os.remove('completed_scans/scan_results')
+		filenames = []
+		for filename in os.listdir('completed_scans'):
+			filenames.append('completed_scans/' + filename)
+		with open('completed_scans/scan_results', 'w') as outfile:
+			for fname in filenames:
+				with open(fname) as infile:
+					for line in infile:
+						outfile.write(line)
+		   	outfile.write('\n')	
+		print 'output block files combined and saved in completed_scans/scan_results. Enjoy.'	
+
+
+def clean(confirm = False):
+	if not confirm:
+		a = raw_input('[WARNING]: Cleaning will wipe the results/progress of any current or past scan.\nAre you sure you want to continue? (Y/n) ')
+		if(a == 'Y' or a == 'y' or a == ''):
+			pass
+		else:
+			print 'exiting without cleaning...'
+			exit()
+
+	print 'Cleaning project...'
 	if os.path.exists('ip_blocks'):
 		os.system('rm -r ip_blocks')
 	if os.path.exists('completed_scans'):
 		os.system('rm -r completed_scans')
 	if os.path.exists('program_data'):
 		os.system('rm -r program_data')
+	print 'Done.'
 
 def print_usage():
+	print '[DESCIPTION]:\nNmap Time Controller takes a list of targets and a specified time window and will run port scans only during the specified time window.\nThe program take the list of targets and breaks it up into blocks of 8 IPs at a time so that nmap can parallelize the scanning.\nEach scan on a block of 8 IPs is written to an individual output file in completed_scans folder and is then combined at the end.\nThe final combined output will be completed_scans/scan_results. Enjoy!\n\n'
+	print '[USAGE]:'
 	print 'Start a new scan:'
 	print './nmap_time_controller new [target_file]\n'
 	print 'Resume a scan:'
 	print './nmap_time_controller resume\n'
+	print 'Combine block output of a scan:'
+	print './nmap_time_controller combine\n'
 	print 'Clean up with:'
 	print './nmap_time_controller clean\n'
 
@@ -256,23 +320,24 @@ def main():
 		exit()
 
 	if sys.argv[1] == 'new':
-		print '\nStarting new scan...\n\n'
 		new_scan()
 
 	if sys.argv[1] == 'resume':
 		global scan_window_start
 		global scan_window_end
 		global nmap_command
-		scan_window_start = datetime.strptime(open('program_data/scan_window_start', 'r').read(), '%H:%M').time()
-		scan_window_end = datetime.strptime(open('program_data/scan_window_end', 'r').read(), '%H:%M').time()
+		scan_window_start = datetime.strptime(open('program_data/scan_window_start', 'r').read().rstrip(), '%H:%M').time()
+		scan_window_end = datetime.strptime(open('program_data/scan_window_end', 'r').read().rstrip(), '%H:%M').time()
 		nmap_command = open('program_data/nmap_command', 'r').read()
+		nmap_command.close()
 		print '\nResuming scan...\n\n'
 		scan_loop()
 
+	if sys.argv[1] == 'combine':
+		combine()
+
 	if sys.argv[1] == 'clean':
-		print 'Cleaning project...'
 		clean()
-		print 'Done.\n\n'
 		exit()
 
 	# Globals
