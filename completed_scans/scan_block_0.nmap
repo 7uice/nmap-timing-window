@@ -1,8 +1,0 @@
-# Nmap 6.47 scan initiated Thu Nov 20 09:37:32 2014 as: nmap -oA completed_scans/scan_block_0 -iL ip_blocks/unscanned_blocks/ip_block_0
-Nmap scan report for localhost (127.0.0.1)
-Host is up (0.00030s latency).
-Not shown: 973 closed ports, 26 filtered ports
-PORT    STATE SERVICE
-631/tcp open  ipp
-
-# Nmap done at Thu Nov 20 09:37:37 2014 -- 8 IP addresses (1 host up) scanned in 5.67 seconds

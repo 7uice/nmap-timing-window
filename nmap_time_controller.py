@@ -2,10 +2,6 @@
 
 import sys, re, os, time, glob
 from datetime import datetime
-try:
-    import xml.etree.cElementTree as ET
-except ImportError:
-    import xml.etree.ElementTree as ET
 
 
 
@@ -189,23 +185,20 @@ def new_scan():
 		filename = 'program_data/nmap_command'
 		f = open(filename, 'w')
 		f.write(nmap_command)
-				
 
 	# print 'IPs to scan:\n', ips
 	# print 'Scan window: ', scan_window_start.strftime('%H:%M'), ' - ', scan_window_end.strftime('%H:%M')
 	# print 'Nmap command: ', nmap_command		
 
-	# FIX THIS LATER
-	# Currently leaves off IPs (only gets all IPs when divisible by 8)
 	# Put IPs in groups of 8. Keep them in groups of 8 so nmap can do it's parallelization magic while scanning.
 	counter = 0
 	ip_block = ''
 	block_index = 0
 	for ip in ips:
-		if counter < 8:
+		if counter < 8: # Add IP to ip_block until we have 8 of them
 			ip_block += (str(ip) + '\n')
 			counter += 1
-		else:
+		else: # We have 8 IPs in the ip_block. Write it to file
 			if not os.path.exists('ip_blocks/unscanned_blocks'):
 				os.makedirs('ip_blocks/unscanned_blocks')
 			filename = 'ip_blocks/unscanned_blocks/ip_block_' + str(block_index)
@@ -215,6 +208,13 @@ def new_scan():
 			ip_block = ''
 			counter = 0
 			block_index += 1
+	# Catch all IPs at the end (for CIDR blocks that are not exact multiples of 8)
+	if not os.path.exists('ip_blocks/unscanned_blocks'):
+		os.makedirs('ip_blocks/unscanned_blocks')
+	filename = 'ip_blocks/unscanned_blocks/ip_block_' + str(block_index)
+	f = open(filename, 'w')
+	f.write(ip_block)
+	f.close()
 
 	scan_loop()
 
@@ -244,6 +244,7 @@ def scan_loop():
 		wait_for_valid_window()
 	if not c:
 		print 'Exiting because all targets have been scanned'
+		combine()
 
 
 def wait_for_valid_window():
@@ -300,6 +301,7 @@ def combine_gnmap():
 					outfile.write(line)
 	   	outfile.write('\n')	
 
+# A bit tricky and a bit messy
 def combine_xml():
 	filenames = []
 	for filename in glob.glob('completed_scans/*.xml'):
@@ -310,6 +312,43 @@ def combine_xml():
 				for line in infile:
 					outfile.write(line)
 	   	outfile.write('\n')	
+   	# Get rid of repeated lines (Results from concating xml files together) and stuff we don't need
+   	line_number = 1
+   	lines_to_remove = []
+   	with open('completed_scans/scan_results.xml', 'r') as f:
+   		for line in f:
+   			if ("<?xml version=" in line and line_number != 1):
+   				lines_to_remove.append(line_number)
+   			elif ("<!DOCTYPE nmaprun>" in line and line_number != 2):
+   				lines_to_remove.append(line_number)
+   			elif ("<nmaprun " in line and (not (line_number < 10))):
+   				lines_to_remove.append(line_number)
+   			elif ("</nmaprun>" in line):
+   				lines_to_remove.append(line_number)
+			elif ("<scaninfo " in line):
+				lines_to_remove.append(line_number)
+			elif ("<?xml-stylesheet " in line):
+				lines_to_remove.append(line_number)
+			line_number += 1
+	# Remake file without unnecessary lines
+	#os.remove('completed_scans/scan_results.xml')
+	f = open('completed_scans/scan_results.xml', 'r')
+	lines = f.readlines()
+	f.close()
+	f = open('completed_scans/scan_results_cleaned_up.xml', 'w')
+	line_number = 1
+	for line in lines:
+		if line_number not in lines_to_remove:
+			f.write(line)
+		line_number+=1
+	f.write("</nmaprun>")
+	f.close()
+
+
+   		#increment line number
+   		#append '</nmaprun>' at the end
+
+
 
 def clean(confirm = False):
 	if not confirm:
